@@ -86,7 +86,7 @@ resource "aws_default_route_table" "homework-route" {
   }
 }
 
-#Create a secutiry group with ports HTTP,SSH and ICMP allowed:
+#Create a secutiry group with HTTP,SSH and ICMP allowed:
 resource "aws_security_group" "homework-sg" {
   name        = "homework-sg"
   vpc_id      = aws_vpc.homework-vpc.id
