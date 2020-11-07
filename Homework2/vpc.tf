@@ -1,28 +1,30 @@
 # VPC:
 resource "aws_vpc" "homework-vpc" {
   cidr_block = "10.10.0.0/16"
+
   tags = {
     Name = "homework-vpc"
   }
 }
 
 # Public and private subnets
-data "aws_availability_zones" "available" {}
-
 resource "aws_subnet" "homework-public-subnet" {
   vpc_id            = aws_vpc.homework-vpc.id
-  count             = 2
+  count             = length(var.public_cidr_block)
   availability_zone = data.aws_availability_zones.available.names[count.index]
   cidr_block        = var.public_cidr_block[count.index]
+
   tags = {
     Name = "homework-public-subnet ${count.index + 1}"
   }
 }
+
 resource "aws_subnet" "homework-private-subnet" {
   vpc_id            = aws_vpc.homework-vpc.id
-  count             = 2
+  count             = length(var.private_cidr_block)
   availability_zone = data.aws_availability_zones.available.names[count.index]
   cidr_block        = var.private_cidr_block[count.index]
+
   tags = {
     Name = "homework-private-subnet ${count.index + 1}"
   }
@@ -31,57 +33,73 @@ resource "aws_subnet" "homework-private-subnet" {
 # Internet gateway
 resource "aws_internet_gateway" "homework-gw" {
   vpc_id = aws_vpc.homework-vpc.id
+
   tags = {
     Name = "homework-gateway"
   }
 }
 
-# NAT gateway
+# NAT gateways
 resource "aws_eip" "nat_gateway" {
-  vpc = true
+  vpc   = true
+  count = length(var.public_cidr_block)
+
+  # added tags to eips
+  tags = {
+    Name = "homework-eip ${count.index + 1}"
+  }
 }
 
 resource "aws_nat_gateway" "nat-gw" {
-  allocation_id = aws_eip.nat_gateway.id
-  subnet_id     = aws_subnet.homework-public-subnet[0].id
+  count         = length(var.public_cidr_block)
+  allocation_id = aws_eip.nat_gateway.*.id[count.index]
+  subnet_id     = aws_subnet.homework-public-subnet.*.id[count.index]
   depends_on    = [aws_internet_gateway.homework-gw]
+
   tags = {
-    Name = "homework-nat-gw"
+    Name = "homework-nat-gw ${count.index + 1}"
   }
 }
 
 # Routeing
-resource "aws_route_table" "public-subnet-route" {
+resource "aws_route_table" "route_tables" {
+  count  = length(var.route_tables_names)
   vpc_id = aws_vpc.homework-vpc.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.homework-gw.id
-  }
+
   tags = {
-    "Name" = "public-subnet-route"
+    Name = var.route_tables_names[count.index]
   }
 }
 
-resource "aws_route_table" "private-subnet-route" {
-  vpc_id = aws_vpc.homework-vpc.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_nat_gateway.nat-gw.id
-  }
-  tags = {
-    "Name" = "private-subnet-route"
-  }
+resource "aws_route" "public" {
+  route_table_id         = aws_route_table.route_tables[0].id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.homework-gw.id
 }
+
+resource "aws_route" "private" {
+  count                  = length(var.private_cidr_block)
+  route_table_id         = aws_route_table.route_tables.*.id[count.index + 1]
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.nat-gw.*.id[count.index]
+}
+
 
 resource "aws_route_table_association" "to-public-subnet-route" {
-  count = length(var.public_cidr_block)
-  subnet_id = aws_subnet.homework-public-subnet[count.index].id
-  route_table_id = aws_route_table.public-subnet-route.id
+  count          = length(var.public_cidr_block)
+  subnet_id      = aws_subnet.homework-public-subnet[count.index].id
+  route_table_id = aws_route_table.route_tables[0].id
 }
 
-# Create a secutiry group with HTTP,SSH and ICMP allowed:
-resource "aws_security_group" "homework-sg" {
-  name   = "homework-sg"
+resource "aws_route_table_association" "to-private-subnet-route" {
+  count          = length(var.private_cidr_block)
+  subnet_id      = aws_subnet.homework-private-subnet[count.index].id
+  route_table_id = aws_route_table.route_tables[count.index + 1].id
+}
+
+# Create a public secutiry group with HTTP,SSH and ICMP allowed:
+resource "aws_security_group" "public-sg" {
+  name   = "homework-public-sg"
   vpc_id = aws_vpc.homework-vpc.id
 
   ingress {
@@ -113,5 +131,28 @@ resource "aws_security_group" "homework-sg" {
   }
   tags = {
     Name = "homework-sg"
+  }
+}
+
+# Create a public private group with HTTP,SSH and ICMP allowed:
+resource "aws_security_group" "private-sg" {
+  name   = "homework-private-sg"
+  vpc_id = aws_vpc.homework-vpc.id
+
+  ingress {
+    description = "Allow SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "homework-db-sg"
   }
 }

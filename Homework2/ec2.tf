@@ -20,7 +20,7 @@ resource "aws_instance" "web-servers" {
   count                       = 2
   subnet_id                   = aws_subnet.homework-public-subnet[count.index].id
   associate_public_ip_address = "true"
-  vpc_security_group_ids      = [aws_security_group.homework-sg.id]
+  vpc_security_group_ids      = [aws_security_group.public-sg.id]
   user_data = var.user_data
   tags = {
     Name    = "web-server-${count.index + 1}"
@@ -37,7 +37,7 @@ resource "aws_instance" "db-servers" {
   count                       = 2
   subnet_id                   = aws_subnet.homework-private-subnet[count.index].id
   associate_public_ip_address = "false"
-  vpc_security_group_ids      = [aws_security_group.homework-sg.id]
+  vpc_security_group_ids      = [aws_security_group.private-sg.id]
   tags = {
     Name    = "db-server-${count.index + 1}"
     Owner   = "Rotem-a"
