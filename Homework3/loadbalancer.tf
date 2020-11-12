@@ -6,11 +6,11 @@ resource "aws_lb" "web-lb" {
   subnets            = module.VPC.public-subnets-for-lb
   security_groups    = module.VPC.public-sg
 
-  access_logs {
+  /*access_logs {
     bucket  = aws_s3_bucket.web-logs.bucket
     prefix  = "lb-web-logs"
     enabled = true
-  }
+  }*/
 
   tags = {
     Name = "web-lb"
@@ -53,7 +53,7 @@ resource "aws_lb_target_group_attachment" "web-servers-target" {
   port             = 80
 }
 
-# S3 bucket for the LB logs
+/*# S3 bucket for the LB logs
 data "aws_elb_service_account" "main" {}
 
 resource "aws_s3_bucket" "web-logs" {
@@ -79,4 +79,4 @@ resource "aws_s3_bucket" "web-logs" {
   ]
 }
 POLICY
-}
+}/*

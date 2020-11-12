@@ -8,6 +8,7 @@ resource "aws_instance" "web-servers" {
   associate_public_ip_address = "true"
   vpc_security_group_ids      = module.VPC.public-sg
   user_data                   = var.user_data
+  iam_instance_profile        = "ec2-to-S3-profile"
 
   tags = {
     Name    = "web-server-${count.index + 1}"
